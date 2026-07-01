@@ -1,0 +1,40 @@
+name: wallpaper_app
+description: "A professional Flutter wallpaper app with Supabase backend and premium subscriptions."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # --- Backend & Database ---
+  supabase_flutter: ^2.5.0      # Supabase database integration ke liye
+
+  # --- UI & Image Handling ---
+  cupertino_icons: ^1.0.6
+  cached_network_image: ^3.3.1  # Images caching aur smooth loading ke liye
+  image_picker: ^1.1.2          # Admin dashboard se gallery picks ke liye
+  smooth_page_indicator: ^1.2.0+3 # Carousel page indicator for animated slideshow
+
+  # --- File Handling & Stable Downloads ---
+  dio: ^5.4.3+1                 # Background downloading streams ke liye
+  path_provider: ^2.1.3         # Temporary file directories access karne ke liye
+  gal: ^2.3.1                   # image_gallery_saver ka updated alternate
+  permission_handler: ^11.3.1   # Phone Storage permissions handle karne ke liye
+  shared_preferences: ^2.2.3    # FIX: Version stable kiya taaki conflict na aaye
+
+  # --- Real In-App Purchases & Subscriptions ---
+  flutter_riverpod: ^2.4.0
+  purchases_flutter: ^8.4.0    # RevenueCat real payment system integration ke liye
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
