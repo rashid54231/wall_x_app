@@ -45,19 +45,24 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
         return;
       }
 
-      final tempDir = await getTemporaryDirectory();
-      final String fileName = "wallpaper_${DateTime.now().millisecondsSinceEpoch}.jpg";
-      final String savePath = "${tempDir.path}/$fileName";
+      // Direct Pictures folder mein save karo
+      final picturesDir = await getExternalStorageDirectory();
+      if (picturesDir == null) throw "Storage access denied";
+
+      // DCIM/WallXApp folder banao
+      final appDir = Directory("${picturesDir.path}/DCIM/WallXApp");
+      if (!await appDir.exists()) {
+        await appDir.create(recursive: true);
+      }
+
+      final String fileName = "WallX_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      final String savePath = "${appDir.path}/$fileName";
 
       final dio = Dio();
       await dio.download(imageUrl, savePath);
 
+      // Media scanner trigger karo taake gallery mein dikhe
       await Gal.putImage(savePath);
-
-      final file = File(savePath);
-      if (await file.exists()) {
-        await file.delete();
-      }
 
       _showSnackBar("Wallpaper Gallery mein save ho gaya!", isError: false);
     } catch (e) {
