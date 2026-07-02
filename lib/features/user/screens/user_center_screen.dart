@@ -84,6 +84,41 @@ class _UserCenterScreenState extends ConsumerState<UserCenterScreen> {
     );
   }
 
+  void _showLogoutDialog() {
+    final isDark = themeNotifier.value == ThemeMode.dark;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDark ? AppColors.surface : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Logout", style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text("Kya aap apne account se logout karna chahte hain?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              await ref.read(authProvider.notifier).logout();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Logged out successfully!"), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating),
+                );
+              }
+            },
+            child: const Text("Logout", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = themeNotifier.value == ThemeMode.dark;
@@ -340,6 +375,14 @@ class _UserCenterScreenState extends ConsumerState<UserCenterScreen> {
                     title: Text("Share App With Friends", style: TextStyle(color: textColor, fontSize: 15)),
                     onTap: () {},
                   ),
+                  if (auth.isLoggedIn) ...[
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    ListTile(
+                      leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+                      title: const Text("Logout", style: TextStyle(color: Colors.redAccent, fontSize: 15, fontWeight: FontWeight.w500)),
+                      onTap: () => _showLogoutDialog(),
+                    ),
+                  ],
                 ],
               ),
             ),
