@@ -238,23 +238,26 @@ class _UserDashboardState extends State<UserDashboard> {
     int crossAxisCount;
     double childAspectRatio;
     if (width >= 1200) {
-      crossAxisCount = 4;
-      childAspectRatio = 0.6;
+      crossAxisCount = 5;
+      childAspectRatio = 0.5;
     } else if (width >= 900) {
-      crossAxisCount = 3;
-      childAspectRatio = 0.65;
+      crossAxisCount = 4;
+      childAspectRatio = 0.55;
     } else if (width >= 600) {
-      crossAxisCount = 2;
-      childAspectRatio = 0.7;
+      crossAxisCount = 3;
+      childAspectRatio = 0.6;
+    } else if (width >= 400) {
+      crossAxisCount = 3;
+      childAspectRatio = 0.55;
     } else {
-      crossAxisCount = 1;
-      childAspectRatio = 0.8;
+      crossAxisCount = 2;
+      childAspectRatio = 0.55;
     }
     return SliverGridDelegateWithFixedCrossAxisCount(
       crossAxisCount: crossAxisCount,
       childAspectRatio: childAspectRatio,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
     );
   }
 

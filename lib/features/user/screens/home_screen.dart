@@ -122,7 +122,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
         if (categoryWalls.isEmpty) return const SizedBox.shrink();
 
-        final displayWalls = categoryWalls.take(3).toList();
+        // Screen size ke hisab se kitne wallpapers dikhane hain
+        final screenWidth = MediaQuery.of(context).size.width;
+        final padding = 32.0; // left + right padding
+        final spacing = 8.0;
+        int cardsVisible;
+        if (screenWidth < 360) {
+          cardsVisible = 2;
+        } else if (screenWidth < 500) {
+          cardsVisible = 3;
+        } else if (screenWidth < 700) {
+          cardsVisible = 4;
+        } else {
+          cardsVisible = 5;
+        }
+        final displayCount = cardsVisible < categoryWalls.length ? cardsVisible : categoryWalls.length;
+        final displayWalls = categoryWalls.take(displayCount).toList();
+        final cardWidth = (screenWidth - padding - (spacing * (cardsVisible - 1))) / cardsVisible;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,11 +164,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       );
                     },
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Text("View All", style: TextStyle(color: Colors.blueAccent, fontSize: 13, fontWeight: FontWeight.bold)),
-                        SizedBox(width: 4),
-                        Icon(Icons.arrow_forward_ios_rounded, color: Colors.blueAccent, size: 12),
+                        if (categoryWalls.length > displayCount)
+                          Text("View All (${categoryWalls.length - displayCount} more) ",
+                              style: const TextStyle(color: Colors.blueAccent, fontSize: 13, fontWeight: FontWeight.bold)),
+                        if (categoryWalls.length <= displayCount)
+                          const Text("View All", style: TextStyle(color: Colors.blueAccent, fontSize: 13, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.blueAccent, size: 12),
                       ],
                     ),
                   ),
@@ -161,16 +181,16 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(
               height: 240,
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 itemCount: displayWalls.length,
+                separatorBuilder: (_, __) => SizedBox(width: spacing),
                 itemBuilder: (context, wallIndex) {
                   final wallpaper = displayWalls[wallIndex];
-                  return Container(
-                    width: 150,
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                  return SizedBox(
+                    width: cardWidth,
                     child: _buildWallpaperCard(wallpaper),
                   );
                 },

@@ -25,48 +25,40 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   @override
   void initState() {
     super.initState();
-    // Premium status refresh karo taake purana data na rahe
     Future.microtask(() => ref.read(premiumProvider.notifier).refresh());
+  }
+
+  bool _checkPremiumAccess(bool isPremium) {
+    if (!isPremium) return true;
+    return ref.read(premiumProvider);
   }
 
   Future<void> _downloadWallpaper(String imageUrl) async {
     setState(() => _isDownloading = true);
-
     try {
       if (imageUrl.isEmpty) throw "Image link missing";
 
       bool hasPermission = await Gal.hasAccess();
+      if (!hasPermission) hasPermission = await Gal.requestAccess();
       if (!hasPermission) {
-        hasPermission = await Gal.requestAccess();
-      }
-
-      if (!hasPermission) {
-        _showSnackBar("Gallery permission denied! Settings se allow karein.", isError: true);
+        _showSnackBar("Gallery permission denied!", isError: true);
         return;
       }
 
-      // Direct Pictures folder mein save karo
       final picturesDir = await getExternalStorageDirectory();
       if (picturesDir == null) throw "Storage access denied";
-
-      // DCIM/WallXApp folder banao
       final appDir = Directory("${picturesDir.path}/DCIM/WallXApp");
-      if (!await appDir.exists()) {
-        await appDir.create(recursive: true);
-      }
+      if (!await appDir.exists()) await appDir.create(recursive: true);
 
       final String fileName = "WallX_${DateTime.now().millisecondsSinceEpoch}.jpg";
       final String savePath = "${appDir.path}/$fileName";
 
-      final dio = Dio();
-      await dio.download(imageUrl, savePath);
-
-      // Media scanner trigger karo taake gallery mein dikhe
+      await Dio().download(imageUrl, savePath);
       await Gal.putImage(savePath);
 
       _showSnackBar("Wallpaper Gallery mein save ho gaya!", isError: false);
     } catch (e) {
-      _showSnackBar("Download fail ho gaya: $e", isError: true);
+      _showSnackBar("Download fail: $e", isError: true);
     } finally {
       if (mounted) setState(() => _isDownloading = false);
     }
@@ -88,13 +80,14 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   Widget build(BuildContext context) {
     bool isPremium = widget.wallpaperData['is_premium'] ?? false;
     String imageUrl = widget.wallpaperData['url'] ?? '';
+    bool hasAccess = _checkPremiumAccess(isPremium);
 
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
           children: [
-            // Top bar - Back button
+            // Top bar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
@@ -125,7 +118,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
               ),
             ),
 
-            // Wallpaper image - Expanded to fill available space
+            // Wallpaper image
             Expanded(
               child: imageUrl.isNotEmpty
                   ? InteractiveViewer(
@@ -141,7 +134,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                               children: [
                                 CircularProgressIndicator(color: AppColors.primary),
                                 SizedBox(height: 16),
-                                Text("Loading wallpaper...", style: TextStyle(color: Colors.white54, fontSize: 14)),
+                                Text("Loading...", style: TextStyle(color: Colors.white54, fontSize: 14)),
                               ],
                             ),
                           ),
@@ -169,12 +162,10 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                         ),
                       ),
                     )
-                  : const Center(
-                      child: Text("Image link missing", style: TextStyle(color: Colors.white54)),
-                    ),
+                  : const Center(child: Text("Image link missing", style: TextStyle(color: Colors.white54))),
             ),
 
-            // Bottom Download Bar
+            // Bottom Action Bar
             Container(
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -183,59 +174,48 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isPremium
-                            ? (ref.watch(premiumProvider) ? AppColors.primary : Colors.amber)
-                            : AppColors.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        elevation: 0,
+              child: hasAccess
+                  ? SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                        ),
+                        onPressed: _isDownloading ? null : () => _downloadWallpaper(imageUrl),
+                        icon: _isDownloading
+                            ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Icon(Icons.file_download, color: Colors.white),
+                        label: Text(_isDownloading ? "Saving..." : "Download Wallpaper",
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                       ),
-                      onPressed: _isDownloading
-                          ? null
-                          : () async {
-                              if (isPremium) {
-                                final bool userHasPremium = ref.watch(premiumProvider);
-                                if (!userHasPremium) {
-                                  final bool? result = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (context) => const PremiumPaywallScreen()),
-                                  );
-                                  if (result != true) return;
-                                }
-                              }
-                              _downloadWallpaper(imageUrl);
-                            },
-                      icon: _isDownloading
-                          ? const SizedBox.shrink()
-                          : Icon(
-                              isPremium ? Icons.workspace_premium : Icons.file_download,
-                              color: Colors.white,
-                            ),
-                      label: _isDownloading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : Text(
-                              isPremium
-                                  ? (ref.watch(premiumProvider) ? "Download Wallpaper" : "Unlock Premium")
-                                  : "Download Wallpaper",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                              ),
-                            ),
+                    )
+                  : SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amber,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                        ),
+                        onPressed: () async {
+                          final bool? result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const PremiumPaywallScreen()),
+                          );
+                          if (result == true && mounted) {
+                            setState(() {});
+                            ref.read(premiumProvider.notifier).refresh();
+                          }
+                        },
+                        icon: const Icon(Icons.workspace_premium, color: Colors.white),
+                        label: const Text("Unlock Premium to Download",
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      ),
                     ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
