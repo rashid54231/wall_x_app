@@ -288,6 +288,7 @@ class _UserDashboardState extends State<UserDashboard> {
         final wallpaper = favoriteWallpapers[index];
         final String idString = wallpaper['id'].toString();
         bool isPremium = wallpaper['is_premium'] ?? false;
+        bool isAnimated = wallpaper['is_animated'] ?? false;
 
         return GestureDetector(
           onTap: () async {
@@ -306,24 +307,31 @@ class _UserDashboardState extends State<UserDashboard> {
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Image.network(
-                    wallpaper['url'],
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                    cacheWidth: 400,
-                    frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                      if (wasSynchronouslyLoaded) return child;
-                      return AnimatedOpacity(
-                        opacity: frame == null ? 0 : 1,
-                        duration: const Duration(milliseconds: 300),
-                        child: child,
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) => const Center(
-                      child: Icon(Icons.broken_image_rounded, color: Colors.grey, size: 32),
-                    ),
-                  ),
+                  child: isAnimated
+                      ? Container(
+                          color: AppColors.primary.withValues(alpha: 0.2),
+                          child: const Center(
+                            child: Icon(Icons.videocam_rounded, color: Colors.white54, size: 40),
+                          ),
+                        )
+                      : Image.network(
+                          wallpaper['url'],
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          cacheWidth: 400,
+                          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                            if (wasSynchronouslyLoaded) return child;
+                            return AnimatedOpacity(
+                              opacity: frame == null ? 0 : 1,
+                              duration: const Duration(milliseconds: 300),
+                              child: child,
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) => const Center(
+                            child: Icon(Icons.broken_image_rounded, color: Colors.grey, size: 32),
+                          ),
+                        ),
                 ),
                 Positioned(
                   top: 10,
@@ -352,6 +360,20 @@ class _UserDashboardState extends State<UserDashboard> {
                         border: Border.all(color: Colors.amber, width: 1.2),
                       ),
                       child: const Icon(Icons.workspace_premium, color: Colors.amber, size: 12),
+                    ),
+                  ),
+                if (isAnimated)
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.2),
+                      ),
+                      child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 14),
                     ),
                   ),
               ],

@@ -280,12 +280,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   const Text("1. Select Wallpaper Image", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
 
-                  // Image Picker Container
                   GestureDetector(
                     onTap: () async {
-                      final file = await _picker.pickImage(source: ImageSource.gallery);
+                      final file = await _picker.pickMedia(imageQuality: 80);
                       if (file != null) {
-                        setState(() => _selectedImage = File(file.path));
+                        final path = file.path.toLowerCase();
+                        final isVideo = path.endsWith('.mp4') || path.endsWith('.mov') || path.endsWith('.avi') || path.endsWith('.mkv');
+                        setState(() {
+                          _selectedImage = File(file.path);
+                          if (isVideo) _isAnimated = true;
+                        });
                       }
                     },
                     child: Container(
@@ -297,7 +301,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         border: Border.all(color: Colors.grey.withOpacity(0.2)),
                       ),
                       child: _selectedImage != null
-                          ? ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.file(_selectedImage!, fit: BoxFit.cover))
+                          ? (_selectedImage!.path.toLowerCase().endsWith('.mp4') || _selectedImage!.path.toLowerCase().endsWith('.mov') || _selectedImage!.path.toLowerCase().endsWith('.avi') || _selectedImage!.path.toLowerCase().endsWith('.mkv')
+                              ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.videocam, size: 50, color: Colors.purple), SizedBox(height: 10), Text("Video Selected", style: TextStyle(color: Colors.white))]))
+                              : ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.file(_selectedImage!, fit: BoxFit.cover)))
                           : const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

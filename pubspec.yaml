@@ -19,6 +19,7 @@ dependencies:
   cached_network_image: ^3.3.1  # Images caching aur smooth loading ke liye
   image_picker: ^1.1.2          # Admin dashboard se gallery picks ke liye
   smooth_page_indicator: ^1.2.0+3 # Carousel page indicator for animated slideshow
+  video_player: ^2.9.2          # Live wallpaper preview ke liye
 
   # --- File Handling & Stable Downloads ---
   dio: ^5.4.3+1                 # Background downloading streams ke liye

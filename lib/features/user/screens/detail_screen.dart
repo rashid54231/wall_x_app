@@ -9,6 +9,8 @@ import '../../../core/providers/premium_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'premium_screen.dart';
 import '../controllers/favorites_storage.dart';
+import 'package:video_player/video_player.dart';
+
 
 class DetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> wallpaperData;
@@ -23,12 +25,36 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   bool _isDownloading = false;
   bool _imageLoaded = false;
   bool _isFavorite = false;
+  VideoPlayerController? _videoController;
 
   @override
   void initState() {
     super.initState();
     Future.microtask(() => ref.read(premiumProvider.notifier).refresh());
     _checkIfFavorite();
+    
+    String url = widget.wallpaperData['url'] ?? '';
+    bool isAnimated = (widget.wallpaperData['is_animated'] == true) || 
+                      url.toLowerCase().contains('.mp4') || 
+                      url.toLowerCase().contains('.mov');
+
+    if (isAnimated && url.isNotEmpty) {
+      _videoController = VideoPlayerController.networkUrl(Uri.parse(url))
+        ..initialize().then((_) {
+          _videoController!.setLooping(true);
+          _videoController!.setVolume(0.0);
+          _videoController!.play();
+          if (mounted) setState(() {});
+        }).catchError((e) {
+          debugPrint("Video initialize error: $e");
+        });
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
   }
 
   Future<void> _checkIfFavorite() async {
@@ -51,7 +77,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   Future<void> _downloadWallpaper(String imageUrl) async {
     setState(() => _isDownloading = true);
     try {
-      if (imageUrl.isEmpty) throw "Image link missing";
+      if (imageUrl.isEmpty) throw "Media link missing";
 
       bool hasPermission = await Gal.hasAccess();
       if (!hasPermission) hasPermission = await Gal.requestAccess();
@@ -65,13 +91,20 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
       final appDir = Directory("${picturesDir.path}/DCIM/WallXApp");
       if (!await appDir.exists()) await appDir.create(recursive: true);
 
-      final String fileName = "WallX_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      final bool isAnimated = widget.wallpaperData['is_animated'] ?? false;
+      final String extension = isAnimated ? ".mp4" : ".jpg";
+      final String fileName = "WallX_${DateTime.now().millisecondsSinceEpoch}$extension";
       final String savePath = "${appDir.path}/$fileName";
 
       await Dio().download(imageUrl, savePath);
-      await Gal.putImage(savePath);
-
-      _showSnackBar("Wallpaper Gallery mein save ho gaya!", isError: false);
+      
+      if (isAnimated) {
+        await Gal.putVideo(savePath);
+        _showSnackBar("Video wallpaper gallery mein save ho gaya!", isError: false);
+      } else {
+        await Gal.putImage(savePath);
+        _showSnackBar("Wallpaper Gallery mein save ho gaya!", isError: false);
+      }
     } catch (e) {
       _showSnackBar("Download fail: $e", isError: true);
     } finally {
@@ -93,8 +126,11 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bool isPremium = widget.wallpaperData['is_premium'] ?? false;
     String imageUrl = widget.wallpaperData['url'] ?? '';
+    bool isPremium = widget.wallpaperData['is_premium'] ?? false;
+    bool isAnimated = (widget.wallpaperData['is_animated'] == true) || 
+                      imageUrl.toLowerCase().contains('.mp4') || 
+                      imageUrl.toLowerCase().contains('.mov');
     bool hasAccess = _checkPremiumAccess(isPremium);
 
     return Scaffold(
@@ -143,51 +179,67 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
               ),
             ),
 
-            // Wallpaper image
+            // Wallpaper media
             Expanded(
               child: imageUrl.isNotEmpty
                   ? InteractiveViewer(
                       minScale: 0.5,
                       maxScale: 4.0,
                       child: Center(
-                        child: CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.contain,
-                          placeholder: (context, url) => const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CircularProgressIndicator(color: AppColors.primary),
-                                SizedBox(height: 16),
-                                Text("Loading...", style: TextStyle(color: Colors.white54, fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.broken_image_rounded, color: Colors.redAccent, size: 50),
-                                const SizedBox(height: 12),
-                                const Text("Image load nahi ho saki", style: TextStyle(color: Colors.white54, fontSize: 14)),
-                                const SizedBox(height: 8),
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text("Go Back", style: TextStyle(color: Colors.blueAccent)),
+                        child: isAnimated
+                            ? (_videoController != null && _videoController!.value.isInitialized
+                                ? AspectRatio(
+                                    aspectRatio: _videoController!.value.aspectRatio,
+                                    child: VideoPlayer(_videoController!),
+                                  )
+                                : const Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        CircularProgressIndicator(color: AppColors.primary),
+                                        SizedBox(height: 16),
+                                        Text("Loading Video...", style: TextStyle(color: Colors.white54, fontSize: 14)),
+                                      ],
+                                    ),
+                                  ))
+                            : CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                fit: BoxFit.contain,
+                                placeholder: (context, url) => const Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      CircularProgressIndicator(color: AppColors.primary),
+                                      SizedBox(height: 16),
+                                      Text("Loading...", style: TextStyle(color: Colors.white54, fontSize: 14)),
+                                    ],
+                                  ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          imageBuilder: (context, imageProvider) {
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (mounted && !_imageLoaded) setState(() => _imageLoaded = true);
-                            });
-                            return Image(image: imageProvider, fit: BoxFit.contain);
-                          },
-                        ),
+                                errorWidget: (context, url, error) => Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.broken_image_rounded, color: Colors.redAccent, size: 50),
+                                      const SizedBox(height: 12),
+                                      const Text("Media load nahi ho saki", style: TextStyle(color: Colors.white54, fontSize: 14)),
+                                      const SizedBox(height: 8),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text("Go Back", style: TextStyle(color: Colors.blueAccent)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                imageBuilder: (context, imageProvider) {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (mounted && !_imageLoaded) setState(() => _imageLoaded = true);
+                                  });
+                                  return Image(image: imageProvider, fit: BoxFit.contain);
+                                },
+                              ),
                       ),
                     )
-                  : const Center(child: Text("Image link missing", style: TextStyle(color: Colors.white54))),
+                  : const Center(child: Text("Media link missing", style: TextStyle(color: Colors.white54))),
             ),
 
             // Bottom Action Bar
@@ -213,7 +265,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                         icon: _isDownloading
                             ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                             : const Icon(Icons.file_download, color: Colors.white),
-                        label: Text(_isDownloading ? "Saving..." : "Download Wallpaper",
+                        label: Text(_isDownloading ? "Saving..." : (isAnimated ? "Set Live Wallpaper" : "Download Wallpaper"),
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
                       ),
                     )

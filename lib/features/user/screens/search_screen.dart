@@ -149,6 +149,9 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
             children: [
               _buildTopBar(isDark),
               _buildSearchSection(isDark),
+              // Live Wallpapers Section - search bar ke neeche
+              if (_getLiveWallpapers().isNotEmpty && !_hasSearched)
+                _buildLiveWallpapersSection(isDark),
               Expanded(
                 child: _isLoading && _hasSearched
                     ? _buildShimmerLoading(isDark)
@@ -282,6 +285,207 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
                   child: Icon(Icons.close_rounded, color: isDark ? Colors.grey[500] : Colors.grey[500], size: 18),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Live wallpapers ko filter karna
+  List<Map<String, dynamic>> _getLiveWallpapers() {
+    return _allWallpapers.where((wall) {
+      final isAnim = wall['is_animated'];
+      final url = (wall['url'] ?? '').toString().toLowerCase();
+      return (isAnim == true || isAnim == 1 || isAnim == 'true') ||
+             url.endsWith('.mp4') ||
+             url.endsWith('.mov') ||
+             url.endsWith('.webm') ||
+             url.endsWith('.avi') ||
+             url.endsWith('.mkv') ||
+             url.contains('.mp4?') ||
+             url.contains('.mov?') ||
+             url.contains('video');
+    }).toList();
+  }
+
+  // 🔥 Live Wallpapers Horizontal Section
+  Widget _buildLiveWallpapersSection(bool isDark) {
+    final liveWalls = _getLiveWallpapers();
+    if (liveWalls.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "Live Wallpapers",
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF6B6B).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  "${liveWalls.length}",
+                  style: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const Spacer(),
+              Icon(Icons.arrow_forward_ios_rounded, size: 14, color: isDark ? Colors.grey[600] : Colors.grey[400]),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 160,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: liveWalls.length,
+            itemBuilder: (context, index) {
+              final wall = liveWalls[index];
+              return _buildLiveWallpaperCard(wall, isDark, index);
+            },
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+
+  Widget _buildLiveWallpaperCard(Map<String, dynamic> wallpaper, bool isDark, int index) {
+    final gradient = _gradients[index % _gradients.length];
+    bool isPremium = wallpaper['is_premium'] ?? false;
+
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => DetailScreen(wallpaperData: wallpaper)),
+        );
+        final savedFavs = await FavoritesStorage.getFavorites();
+        if (mounted) setState(() => _favoritedIds = savedFavs);
+      },
+      child: Container(
+        width: 115,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: gradient,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: gradient[0].withValues(alpha: 0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // Gradient overlay
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.5),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Play icon center
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
+                ),
+                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 28),
+              ),
+            ),
+            // "LIVE" badge
+            Positioned(
+              top: 8,
+              left: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF4444),
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(color: Colors.red.withValues(alpha: 0.4), blurRadius: 6),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.fiber_manual_record, color: Colors.white, size: 6),
+                    SizedBox(width: 3),
+                    Text("LIVE", style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
+                  ],
+                ),
+              ),
+            ),
+            // Premium badge
+            if (isPremium)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA000)]),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.workspace_premium, color: Colors.white, size: 10),
+                ),
+              ),
+            // Category name at bottom
+            Positioned(
+              bottom: 8,
+              left: 8,
+              right: 8,
+              child: Text(
+                wallpaper['category_name'] ?? 'Live',
+                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
           ],
         ),
       ),
@@ -484,7 +688,11 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
 
   Widget _buildWallpaperCard(Map<String, dynamic> wallpaper, bool isDark, int index) {
     final String idString = wallpaper['id'].toString();
+    final String url = wallpaper['url'] ?? '';
     bool isPremium = wallpaper['is_premium'] ?? false;
+    bool isAnimated = (wallpaper['is_animated'] == true) || 
+                      url.toLowerCase().contains('.mp4') || 
+                      url.toLowerCase().contains('.mov');
     bool isSaved = _favoritedIds.contains(idString);
     final gradient = _gradients[index % _gradients.length];
 
@@ -521,19 +729,26 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
           child: Stack(
             fit: StackFit.expand,
             children: [
-              CachedNetworkImage(
-                imageUrl: wallpaper['url'] ?? '',
-                fit: BoxFit.cover,
-                memCacheWidth: 400,
-                placeholder: (context, url) => Container(
-                  decoration: BoxDecoration(gradient: LinearGradient(colors: gradient)),
-                  child: const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  decoration: BoxDecoration(gradient: LinearGradient(colors: gradient)),
-                  child: const Icon(Icons.broken_image_rounded, color: Colors.white54, size: 32),
-                ),
-              ),
+              isAnimated
+                  ? Container(
+                      decoration: BoxDecoration(gradient: LinearGradient(colors: gradient)),
+                      child: const Center(
+                        child: Icon(Icons.videocam_rounded, color: Colors.white54, size: 40),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: wallpaper['url'] ?? '',
+                      fit: BoxFit.cover,
+                      memCacheWidth: 400,
+                      placeholder: (context, url) => Container(
+                        decoration: BoxDecoration(gradient: LinearGradient(colors: gradient)),
+                        child: const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        decoration: BoxDecoration(gradient: LinearGradient(colors: gradient)),
+                        child: const Icon(Icons.broken_image_rounded, color: Colors.white54, size: 32),
+                      ),
+                    ),
               Positioned(
                 bottom: 0,
                 left: 0,
@@ -604,6 +819,20 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
                   ),
                 ),
               ),
+              if (isAnimated)
+                Positioned(
+                  bottom: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.2),
+                    ),
+                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 14),
+                  ),
+                ),
             ],
           ),
         ),

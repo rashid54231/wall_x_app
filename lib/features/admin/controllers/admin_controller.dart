@@ -81,7 +81,8 @@ class AdminController {
   }) async {
     try {
       // A. Unique file name
-      final fileName = "${DateTime.now().millisecondsSinceEpoch}.jpg";
+      final extension = imageFile.path.split('.').last.toLowerCase();
+      final fileName = "${DateTime.now().millisecondsSinceEpoch}.$extension";
       final path = 'wallpapers/$fileName';
 
       // B. Upload to Supabase Storage
@@ -154,7 +155,8 @@ class AdminController {
   }) async {
     try {
       // A. Unique file name banana
-      final fileName = "cat_wall_${DateTime.now().millisecondsSinceEpoch}.jpg";
+      final extension = imageFile.path.split('.').last.toLowerCase();
+      final fileName = "cat_wall_${DateTime.now().millisecondsSinceEpoch}.$extension";
       final path = 'catalog_wallpapers/$fileName';
 
       // B. Upload wallpaper file to storage bucket
