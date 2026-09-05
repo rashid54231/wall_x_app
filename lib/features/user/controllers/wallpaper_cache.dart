@@ -144,17 +144,29 @@ class WallpaperCache {
   Future<List<Map<String, dynamic>>> searchWallpapers(String query) async {
     try {
       if (query.trim().isEmpty) return [];
+      final q = query.trim();
+      
       final categories = await _supabase
           .from('categories')
           .select('id')
-          .ilike('name', '%${query.trim()}%');
-      if (categories.isEmpty) return [];
+          .ilike('name', '%$q%');
+          
       final categoryIds = (categories as List).map((c) => c['id'] as int).toList();
-      final data = await _supabase
-          .from('wallpapers')
-          .select()
-          .inFilter('category_id', categoryIds)
-          .order('created_at', ascending: false);
+      
+      List<dynamic> data;
+      if (categoryIds.isNotEmpty) {
+        data = await _supabase
+            .from('wallpapers')
+            .select()
+            .or('tags.ilike.%$q%,category_id.in.(${categoryIds.join(',')})')
+            .order('created_at', ascending: false);
+      } else {
+        data = await _supabase
+            .from('wallpapers')
+            .select()
+            .ilike('tags', '%$q%')
+            .order('created_at', ascending: false);
+      }
       return List<Map<String, dynamic>>.from(data);
     } catch (e) {
       throw Exception("Search karne mein masla aaya: $e");

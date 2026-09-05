@@ -8,6 +8,7 @@ import '../../../core/constants/colors.dart';
 import '../../../core/providers/premium_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'premium_screen.dart';
+import '../controllers/favorites_storage.dart';
 
 class DetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> wallpaperData;
@@ -21,11 +22,25 @@ class DetailScreen extends ConsumerStatefulWidget {
 class _DetailScreenState extends ConsumerState<DetailScreen> {
   bool _isDownloading = false;
   bool _imageLoaded = false;
+  bool _isFavorite = false;
 
   @override
   void initState() {
     super.initState();
     Future.microtask(() => ref.read(premiumProvider.notifier).refresh());
+    _checkIfFavorite();
+  }
+
+  Future<void> _checkIfFavorite() async {
+    final id = widget.wallpaperData['id'].toString();
+    final isFav = await FavoritesStorage.isFavorite(id);
+    if (mounted) setState(() => _isFavorite = isFav);
+  }
+
+  Future<void> _toggleFavorite() async {
+    final id = widget.wallpaperData['id'].toString();
+    final isFav = await FavoritesStorage.toggleFavorite(id);
+    if (mounted) setState(() => _isFavorite = isFav);
   }
 
   bool _checkPremiumAccess(bool isPremium) {
@@ -97,7 +112,16 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                     onPressed: () => Navigator.pop(context),
                   ),
                   const Spacer(),
-                  if (isPremium)
+                  IconButton(
+                    icon: Icon(
+                      _isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                      color: _isFavorite ? Colors.redAccent : Colors.white,
+                      size: 26,
+                    ),
+                    onPressed: _toggleFavorite,
+                  ),
+                  if (isPremium) ...[
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -114,6 +138,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                         ],
                       ),
                     ),
+                  ],
                 ],
               ),
             ),

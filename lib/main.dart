@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/colors.dart';
 import 'features/user/screens/user_dashboard.dart';
+import 'features/user/screens/onboarding_screen.dart';
 import 'features/user/providers/auth_provider.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
@@ -13,6 +15,7 @@ Future<void> main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final isDarkMode = prefs.getBool('isDarkMode') ?? true;
+  final isFirstTime = prefs.getBool('isFirstTime') ?? true;
   themeNotifier.value = isDarkMode ? ThemeMode.dark : ThemeMode.light;
 
   await Supabase.initialize(
@@ -20,11 +23,17 @@ Future<void> main() async {
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdHJ4YmxtcHRxZ2xvc213cHFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMDAzMTAsImV4cCI6MjA5NTg3NjMxMH0.izA5tv6gguYmotg-b6rSJgr5w9Bbyz9_GsNasOthJ2c',
   );
 
-  runApp(const ProviderScope(child: MyApp()));
+  // Initialize OneSignal Push Notifications
+  OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
+  OneSignal.initialize("YOUR_ONESIGNAL_APP_ID"); // TODO: Replace with your OneSignal App ID
+  OneSignal.Notifications.requestPermission(true);
+
+  runApp(ProviderScope(child: MyApp(isFirstTime: isFirstTime)));
 }
 
 class MyApp extends ConsumerStatefulWidget {
-  const MyApp({super.key});
+  final bool isFirstTime;
+  const MyApp({super.key, required this.isFirstTime});
 
   @override
   ConsumerState<MyApp> createState() => _MyAppState();
@@ -68,7 +77,7 @@ class _MyAppState extends ConsumerState<MyApp> {
               titleTextStyle: TextStyle(color: Colors.white),
             ),
           ),
-          home: UserDashboard(),
+          home: widget.isFirstTime ? const OnboardingScreen() : UserDashboard(),
         );
       },
     );

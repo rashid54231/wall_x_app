@@ -75,8 +75,40 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> resetPassword(String email) async {
+  Future<void> sendPasswordResetOtp(String email) async {
     await Supabase.instance.client.auth.resetPasswordForEmail(email);
+  }
+
+  Future<void> verifyOtpAndResetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    // 1. Verify OTP
+    final response = await Supabase.instance.client.auth.verifyOTP(
+      email: email,
+      token: otp,
+      type: OtpType.recovery,
+    );
+
+    if (response.session != null) {
+      // 2. Update to new password
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+      
+      // Update local state
+      final role = await _fetchUserRole(response.user!.id);
+      _user = app_auth.AuthUser(
+        id: response.user!.id,
+        email: response.user!.email ?? '',
+        displayName: response.user!.userMetadata?['full_name'] as String?,
+        role: role,
+      );
+      notifyListeners();
+    } else {
+      throw Exception('Invalid OTP');
+    }
   }
 
   Future<void> refreshRole() async {

@@ -95,8 +95,9 @@ public class MainActivity extends FlutterActivity {
                 // Cleanup
                 if (srcFile.exists()) srcFile.delete();
 
+                final boolean finalSuccess = success;
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    if (success) {
+                    if (finalSuccess) {
                         result.success(true);
                     } else {
                         result.error("FAILED", "Wallpaper set nahi ho paya", null);

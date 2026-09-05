@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/auth_provider.dart';
 import '../../../core/constants/colors.dart';
 
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _emailSent = false;
@@ -18,19 +22,55 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   void dispose() {
     _emailController.dispose();
+    _otpController.dispose();
+    _newPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _resetPassword() async {
+  Future<void> _sendOtp() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
     try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(
-        _emailController.text.trim(),
-      );
+      await ref.read(authProvider.notifier).sendPasswordResetOtp(_emailController.text.trim());
       if (mounted) {
         setState(() => _emailSent = true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_cleanError(e.toString())),
+            backgroundColor: Colors.red[800],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _verifyAndResetPassword() async {
+    if (_otpController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter OTP')));
+      return;
+    }
+    if (_newPasswordController.text.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password must be at least 6 characters')));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      await ref.read(authProvider.notifier).verifyOtpAndResetPassword(
+        email: _emailController.text.trim(),
+        otp: _otpController.text.trim(),
+        newPassword: _newPasswordController.text,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password reset successfully!')));
+        Navigator.pop(context); // Go back to login
       }
     } catch (e) {
       if (mounted) {
@@ -111,7 +151,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                   // Title
                   Text(
-                    _emailSent ? "Check Your Email" : "Forgot Password?",
+                    _emailSent ? "Enter OTP Code" : "Forgot Password?",
                     style: TextStyle(
                       color: isDark ? Colors.white : Colors.black,
                       fontSize: 32,
@@ -122,8 +162,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   const SizedBox(height: 8),
                   Text(
                     _emailSent
-                        ? "We've sent a password reset link to\n${_emailController.text}"
-                        : "No worries! Enter your email and we'll send you a reset link.",
+                        ? "We've sent an 8-digit OTP code to\n${_emailController.text}"
+                        : "No worries! Enter your email and we'll send you an OTP code to reset your password.",
                     style: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[600], fontSize: 15, height: 1.5),
                   ),
 
@@ -173,7 +213,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                           elevation: 0,
                         ),
-                        onPressed: _isLoading ? null : _resetPassword,
+                        onPressed: _isLoading ? null : _sendOtp,
                         child: _isLoading
                             ? const SizedBox(
                                 height: 22,
@@ -181,7 +221,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                               )
                             : const Text(
-                                "Send Reset Link",
+                                "Send OTP Code",
                                 style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
                               ),
                       ),
@@ -189,16 +229,79 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ],
 
                   if (_emailSent) ...[
-                    // Success icon
-                    Center(
-                      child: Container(
-                        height: 100,
-                        width: 100,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.green.withValues(alpha: 0.1),
+                    // OTP field
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06)),
+                      ),
+                      child: TextFormField(
+                        controller: _otpController,
+                        keyboardType: TextInputType.text, // Allowing text in case alphanumeric
+                        maxLength: 8,
+                        style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 18, letterSpacing: 6, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                        decoration: InputDecoration(
+                          counterText: "",
+                          hintText: "00000000",
+                          hintStyle: TextStyle(color: isDark ? Colors.grey[600] : Colors.grey[400], letterSpacing: 6),
+                          filled: true,
+                          fillColor: Colors.transparent,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                         ),
-                        child: const Icon(Icons.mark_email_read_rounded, size: 50, color: Colors.green),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // New Password field
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06)),
+                      ),
+                      child: TextFormField(
+                        controller: _newPasswordController,
+                        obscureText: true,
+                        style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 15),
+                        decoration: InputDecoration(
+                          labelText: "New Password",
+                          labelStyle: TextStyle(color: isDark ? Colors.grey[500] : Colors.grey[500]),
+                          prefixIcon: Icon(Icons.lock_outline, color: isDark ? Colors.grey[500] : Colors.grey[500], size: 22),
+                          filled: true,
+                          fillColor: Colors.transparent,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // Reset Password button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          elevation: 0,
+                        ),
+                        onPressed: _isLoading ? null : _verifyAndResetPassword,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                              )
+                            : const Text(
+                                "Reset Password",
+                                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                              ),
                       ),
                     ),
 

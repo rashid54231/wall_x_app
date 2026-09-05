@@ -27,6 +27,9 @@ dependencies:
   permission_handler: ^11.3.1   # Phone Storage permissions handle karne ke liye
   shared_preferences: ^2.2.3    # FIX: Version stable kiya taaki conflict na aaye
 
+  # --- Push Notifications ---
+  onesignal_flutter: ^5.1.4     # Push notifications handle karne ke liye
+
   # --- Real In-App Purchases & Subscriptions ---
   flutter_riverpod: ^2.4.0
   purchases_flutter: ^8.4.0    # RevenueCat real payment system integration ke liye
