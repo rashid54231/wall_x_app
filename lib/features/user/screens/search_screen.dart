@@ -290,9 +290,10 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
 
   Widget _buildInitialState(bool isDark) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
           Container(
             height: 100,
             width: 100,
@@ -323,6 +324,7 @@ class _SearchScreenState extends State<SearchScreen> with SingleTickerProviderSt
           const SizedBox(height: 32),
           _buildSuggestionChips(isDark),
         ],
+      ),
       ),
     );
   }
