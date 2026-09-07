@@ -900,3 +900,4 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
     return "$dayName, $monthName ${now.day}";
   }
 }
+//details screen
