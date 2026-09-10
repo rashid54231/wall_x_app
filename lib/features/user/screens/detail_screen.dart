@@ -902,3 +902,4 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
 }
 //details screen
 //detaailsscreen
+//de
