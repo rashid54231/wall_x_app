@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../shared_widgets/fast_wallpaper_image.dart';
+import '../controllers/wallpaper_cache.dart';
 import '../controllers/favorites_storage.dart';
 import 'detail_screen.dart';
 import '../../../core/constants/colors.dart';
@@ -19,6 +20,7 @@ class CategoryWallpapersScreen extends StatefulWidget {
 }
 
 class _CategoryWallpapersScreenState extends State<CategoryWallpapersScreen> {
+  final WallpaperCache _cache = WallpaperCache();
   List<Map<String, dynamic>> _allCategoryWalls = [];
   List<Map<String, dynamic>> _latestWalls = [];
   List<Map<String, dynamic>> _mostFavoriteWalls = [];
@@ -32,43 +34,39 @@ class _CategoryWallpapersScreenState extends State<CategoryWallpapersScreen> {
     _loadCategoryData();
   }
 
-  Future<void> _loadCategoryData() async {
+  Future<void> _loadCategoryData({bool forceRefresh = false}) async {
     setState(() { _isLoading = true; _errorMsg = null; });
     try {
-      final supabase = Supabase.instance.client;
+      // ⚡ Single query (or in-memory cache) instead of 3 network calls!
+      final results = await Future.wait([
+        _cache.fetchWallpapersByCategory(widget.categoryId, forceRefresh: forceRefresh),
+        FavoritesStorage.getFavorites(forceRefresh: forceRefresh),
+      ]);
 
-      // Parallel queries - simple and direct
-      final allFuture = supabase
-          .from('wallpapers')
-          .select()
-          .eq('category_id', widget.categoryId)
-          .order('created_at', ascending: false);
+      final allWalls = results[0] as List<Map<String, dynamic>>;
+      final favIds = results[1] as List<String>;
 
-      final latestSince = DateTime.now().subtract(const Duration(days: 3)).toIso8601String();
-      final latestFuture = supabase
-          .from('wallpapers')
-          .select()
-          .eq('category_id', widget.categoryId)
-          .gte('created_at', latestSince)
-          .order('created_at', ascending: false);
+      // Partition in memory in microseconds (< 0.1ms)
+      final latestSince = DateTime.now().subtract(const Duration(days: 3));
+      final latest = allWalls.where((w) {
+        final created = DateTime.tryParse(w['created_at']?.toString() ?? '');
+        return created != null && created.isAfter(latestSince);
+      }).toList();
 
-      final favFuture = supabase
-          .from('wallpapers')
-          .select()
-          .eq('category_id', widget.categoryId)
-          .order('created_at', ascending: false)
-          .limit(20);
-
-      final favsFuture = FavoritesStorage.getFavorites();
-
-      final results = await Future.wait<dynamic>([allFuture, latestFuture, favFuture, favsFuture]);
+      final favSorted = List<Map<String, dynamic>>.from(allWalls);
+      favSorted.sort((a, b) {
+        final fA = (a['fav_count'] as num?)?.toInt() ?? 0;
+        final fB = (b['fav_count'] as num?)?.toInt() ?? 0;
+        return fB.compareTo(fA);
+      });
+      final mostFav = favSorted.take(20).toList();
 
       if (mounted) {
         setState(() {
-          _allCategoryWalls = List<Map<String, dynamic>>.from(results[0] as List);
-          _latestWalls = List<Map<String, dynamic>>.from(results[1] as List);
-          _mostFavoriteWalls = List<Map<String, dynamic>>.from(results[2] as List);
-          _favoritedIds = results[3] as List<String>;
+          _allCategoryWalls = allWalls;
+          _latestWalls = latest;
+          _mostFavoriteWalls = mostFav;
+          _favoritedIds = favIds;
           _isLoading = false;
         });
       }
@@ -236,23 +234,9 @@ class _CategoryWallpapersScreenState extends State<CategoryWallpapersScreen> {
                         child: Icon(Icons.videocam_rounded, color: Colors.white54, size: 40),
                       ),
                     )
-                  : Image.network(
-                      wallpaper['url'] ?? '',
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      cacheWidth: 400,
-                      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                        if (wasSynchronouslyLoaded) return child;
-                        return AnimatedOpacity(
-                          opacity: frame == null ? 0 : 1,
-                          duration: const Duration(milliseconds: 300),
-                          child: child,
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) => const Center(
-                        child: Icon(Icons.broken_image_rounded, color: Colors.grey, size: 32),
-                      ),
+                  : FastWallpaperImage(
+                      imageUrl: wallpaper['url'] ?? '',
+                      memCacheWidth: 400,
                     ),
             ),
             Positioned(

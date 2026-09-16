@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared_widgets/fast_wallpaper_image.dart';
 import '../controllers/wallpaper_cache.dart';
 import '../../../core/constants/colors.dart';
 import 'catalog_wallpapers_screen.dart';
@@ -18,6 +19,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
   @override
   void initState() {
     super.initState();
+    if (_cache.allCatalogs.isNotEmpty) {
+      _catalogsList = _cache.allCatalogs;
+      _isLoading = false;
+    }
     _loadCatalogs();
   }
 
@@ -118,22 +123,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.network(
-                        catalog['cover_url'] ?? '',
-                        fit: BoxFit.cover,
-                        cacheWidth: 400,
-                        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                          if (wasSynchronouslyLoaded) return child;
-                          return AnimatedOpacity(
-                            opacity: frame == null ? 0 : 1,
-                            duration: const Duration(milliseconds: 300),
-                            child: child,
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: AppColors.surface,
-                          child: const Icon(Icons.broken_image_rounded, color: Colors.grey, size: 32),
-                        ),
+                      FastWallpaperImage(
+                        imageUrl: catalog['cover_url'] ?? '',
+                        memCacheWidth: 400,
                       ),
                       Positioned(
                         bottom: 0,

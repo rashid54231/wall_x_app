@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/constants/colors.dart';
 import 'create_catalog_screen.dart';
 import 'premium_requests_screen.dart';
@@ -87,19 +88,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     }
   }
 
-  // Database se dynamic data load karna (Categories, Catalogs, Stats aur Trending)
+  // Database se dynamic data load karna (Categories, Catalogs, Stats aur Trending) in PARALLEL
   Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
     try {
-      final cats = await _controller.fetchCategories();
-      final stats = await _controller.fetchDashboardStats();
-      final catsPacks = await _controller.fetchAllCatalogs();
-      final trendingData = await _controller.fetchTrendingWallpapers();
+      final results = await Future.wait([
+        _controller.fetchCategories(),
+        _controller.fetchDashboardStats(),
+        _controller.fetchAllCatalogs(),
+        _controller.fetchTrendingWallpapers(),
+        _controller.fetchAnimatedWallpapers(),
+      ]);
+
+      final cats = results[0] as List<Map<String, dynamic>>;
+      final stats = results[1] as Map<String, dynamic>;
+      final catsPacks = results[2] as List<Map<String, dynamic>>;
+      final trendingData = results[3] as List<Map<String, dynamic>>;
+      final animated = results[4] as List<Map<String, dynamic>>;
 
       setState(() {
         _categories = cats;
         _catalogs = catsPacks;
         _trendingWallpapers = trendingData;
+        _animatedWallpapers = animated;
         downloads = stats['downloads'];
         subscribers = stats['subscribers'];
         revenue = stats['revenue'];
@@ -510,9 +521,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           itemCount: _animatedWallpapers.length,
                           itemBuilder: (context, index) {
                             final wall = _animatedWallpapers[index];
-                            return Image.network(
-                              wall['url'],
+                            return CachedNetworkImage(
+                              imageUrl: wall['url'] ?? '',
                               fit: BoxFit.cover,
+                              memCacheWidth: 600,
+                              placeholder: (_, __) => Container(color: AppColors.surface),
+                              errorWidget: (_, __, ___) => const Center(child: Icon(Icons.broken_image_rounded, color: Colors.grey)),
                             );
                           },
                         ),
@@ -552,7 +566,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             const SizedBox(width: 12),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(item['url'] ?? '', width: 45, height: 60, fit: BoxFit.cover),
+                              child: CachedNetworkImage(
+                                imageUrl: item['url'] ?? '',
+                                width: 45,
+                                height: 60,
+                                fit: BoxFit.cover,
+                                memCacheWidth: 150,
+                                errorWidget: (_, __, ___) => Container(color: Colors.grey[800], width: 45, height: 60),
+                              ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(

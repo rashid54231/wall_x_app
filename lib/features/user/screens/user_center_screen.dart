@@ -7,7 +7,6 @@ import '../../../core/constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../controllers/favorites_storage.dart';
 import 'login_screen.dart';
-import 'premium_screen.dart';
 import 'premium_purchase_screen.dart';
 import '../../admin/screens/admin_dashboard.dart';
 

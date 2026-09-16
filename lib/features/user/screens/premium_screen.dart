@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../shared_widgets/fast_wallpaper_image.dart';
 import '../controllers/wallpaper_cache.dart';
 import '../controllers/favorites_storage.dart';
 import 'detail_screen.dart';
@@ -24,6 +24,10 @@ class _PremiumTabScreenState extends ConsumerState<PremiumTabScreen> {
   @override
   void initState() {
     super.initState();
+    if (_cache.allWallpapers.isNotEmpty) {
+      _premiumWallpapers = _cache.allWallpapers.where((w) => w['is_premium'] == true).toList();
+      _isLoading = false;
+    }
     _loadPremiumWallpapers();
   }
 
@@ -143,23 +147,9 @@ class _PremiumTabScreenState extends ConsumerState<PremiumTabScreen> {
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Image.network(
-                      wallpaper['url'],
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      cacheWidth: 400,
-                      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                        if (wasSynchronouslyLoaded) return child;
-                        return AnimatedOpacity(
-                          opacity: frame == null ? 0 : 1,
-                          duration: const Duration(milliseconds: 300),
-                          child: child,
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) => const Center(
-                        child: Icon(Icons.broken_image_rounded, color: Colors.grey, size: 32),
-                      ),
+                    child: FastWallpaperImage(
+                      imageUrl: wallpaper['url'] ?? '',
+                      memCacheWidth: 400,
                     ),
                   ),
                   Positioned(

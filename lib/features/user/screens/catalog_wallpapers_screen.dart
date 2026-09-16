@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared_widgets/fast_wallpaper_image.dart';
 import '../controllers/wallpaper_cache.dart';
 import '../../../core/constants/colors.dart';
 import 'detail_screen.dart';
@@ -114,23 +115,9 @@ class _CatalogWallpapersScreenState extends State<CatalogWallpapersScreen> {
                         color: AppColors.surface,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Image.network(
-                        wallpaper['url'] ?? '',
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: double.infinity,
-                        cacheWidth: 300,
-                        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                          if (wasSynchronouslyLoaded) return child;
-                          return AnimatedOpacity(
-                            opacity: frame == null ? 0 : 1,
-                            duration: const Duration(milliseconds: 300),
-                            child: child,
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) => const Center(
-                          child: Icon(Icons.broken_image_rounded, color: Colors.grey, size: 32),
-                        ),
+                      child: FastWallpaperImage(
+                        imageUrl: wallpaper['url'] ?? '',
+                        memCacheWidth: 350,
                       ),
                     ),
                     if (isPremium)

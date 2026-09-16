@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../shared_widgets/fast_wallpaper_image.dart';
 import '../../../../main.dart';
 import '../../../core/constants/colors.dart';
 import '../controllers/wallpaper_cache.dart';
@@ -175,9 +176,9 @@ class _UserDashboardState extends State<UserDashboard> {
               ),
             ),
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: tabs[_currentIndex],
+            child: IndexedStack(
+              index: _currentIndex,
+              children: tabs,
             ),
           ),
         ],
@@ -314,23 +315,9 @@ class _UserDashboardState extends State<UserDashboard> {
                             child: Icon(Icons.videocam_rounded, color: Colors.white54, size: 40),
                           ),
                         )
-                      : Image.network(
-                          wallpaper['url'],
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                          cacheWidth: 400,
-                          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                            if (wasSynchronouslyLoaded) return child;
-                            return AnimatedOpacity(
-                              opacity: frame == null ? 0 : 1,
-                              duration: const Duration(milliseconds: 300),
-                              child: child,
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) => const Center(
-                            child: Icon(Icons.broken_image_rounded, color: Colors.grey, size: 32),
-                          ),
+                      : FastWallpaperImage(
+                          imageUrl: wallpaper['url'] ?? '',
+                          memCacheWidth: 400,
                         ),
                 ),
                 Positioned(

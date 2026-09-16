@@ -5,82 +5,112 @@ class FavoritesStorage {
   static const String _key = 'favorite_wallpapers_ids';
   static final _supabase = Supabase.instance.client;
 
-  // 1. Get favorite wallpaper IDs
-  static Future<List<String>> getFavorites() async {
-    final user = _supabase.auth.currentUser;
-    if (user != null) {
-      try {
-        final data = await _supabase
-            .from('user_favorites')
-            .select('wallpaper_id')
-            .eq('user_id', user.id);
-        return (data as List).map((e) => e['wallpaper_id'].toString()).toList();
-      } catch (e) {
-        // Fallback to local if cloud fails
-      }
+  // In-memory cache for O(1) instantaneous lookups
+  static Set<String>? _memoryCache;
+  static bool _isSyncingCloud = false;
+
+  /// Get favorite wallpaper IDs with instant in-memory & local fallback
+  static Future<List<String>> getFavorites({bool forceRefresh = false}) async {
+    if (!forceRefresh && _memoryCache != null) {
+      return _memoryCache!.toList();
     }
-    
-    // Local fallback
+
+    // Fast-path: read from SharedPreferences first
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList(_key) ?? [];
+    final localList = prefs.getStringList(_key) ?? [];
+    _memoryCache ??= localList.toSet();
+
+    // Background sync from Supabase if logged in
+    final user = _supabase.auth.currentUser;
+    if (user != null && !_isSyncingCloud) {
+      _syncFromCloud(user.id, prefs);
+    }
+
+    return _memoryCache!.toList();
   }
 
-  // 2. Toggle favorite
+  static Future<void> _syncFromCloud(String userId, SharedPreferences prefs) async {
+    _isSyncingCloud = true;
+    try {
+      final data = await _supabase
+          .from('user_favorites')
+          .select('wallpaper_id')
+          .eq('user_id', userId);
+      final cloudIds = (data as List).map((e) => e['wallpaper_id'].toString()).toSet();
+      
+      // Merge cloud with memory cache
+      _memoryCache ??= {};
+      _memoryCache!.addAll(cloudIds);
+      await prefs.setStringList(_key, _memoryCache!.toList());
+    } catch (_) {
+      // Offline or network error - keep local cache safe
+    } finally {
+      _isSyncingCloud = false;
+    }
+  }
+
+  /// Toggle favorite: Updates memory & local disk instantly, syncs Supabase in background
   static Future<bool> toggleFavorite(String wallpaperId) async {
-    final user = _supabase.auth.currentUser;
-    final int wId = int.parse(wallpaperId);
-    bool isNowFav = false;
-
-    if (user != null) {
-      try {
-        final existing = await _supabase
-            .from('user_favorites')
-            .select()
-            .eq('user_id', user.id)
-            .eq('wallpaper_id', wId)
-            .maybeSingle();
-
-        if (existing != null) {
-          await _supabase.from('user_favorites').delete().eq('id', existing['id']);
-          isNowFav = false;
-        } else {
-          await _supabase.from('user_favorites').insert({
-            'user_id': user.id,
-            'wallpaper_id': wId,
-          });
-          isNowFav = true;
-        }
-        
-        // Also update local for offline support
-        final prefs = await SharedPreferences.getInstance();
-        List<String> favorites = prefs.getStringList(_key) ?? [];
-        if (isNowFav && !favorites.contains(wallpaperId)) favorites.add(wallpaperId);
-        if (!isNowFav) favorites.remove(wallpaperId);
-        await prefs.setStringList(_key, favorites);
-        
-        return isNowFav;
-      } catch (e) {
-        // Fallback to local
-      }
+    // Ensure memory cache is initialized
+    if (_memoryCache == null) {
+      final prefs = await SharedPreferences.getInstance();
+      _memoryCache = (prefs.getStringList(_key) ?? []).toSet();
     }
 
-    // Local toggle
-    final prefs = await SharedPreferences.getInstance();
-    List<String> favorites = prefs.getStringList(_key) ?? [];
-    if (favorites.contains(wallpaperId)) {
-      favorites.remove(wallpaperId);
+    final bool isNowFav;
+    if (_memoryCache!.contains(wallpaperId)) {
+      _memoryCache!.remove(wallpaperId);
       isNowFav = false;
     } else {
-      favorites.add(wallpaperId);
+      _memoryCache!.add(wallpaperId);
       isNowFav = true;
     }
-    await prefs.setStringList(_key, favorites);
+
+    // Save to local storage asynchronously
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setStringList(_key, _memoryCache!.toList());
+    });
+
+    // Sync to Supabase in the background
+    final user = _supabase.auth.currentUser;
+    final int? wId = int.tryParse(wallpaperId);
+    if (user != null && wId != null) {
+      _syncToggleCloud(user.id, wId, isNowFav);
+    }
+
     return isNowFav;
   }
 
-  // 3. Check if favorite
+  static Future<void> _syncToggleCloud(String userId, int wId, bool isNowFav) async {
+    try {
+      if (isNowFav) {
+        await _supabase.from('user_favorites').upsert({
+          'user_id': userId,
+          'wallpaper_id': wId,
+        });
+      } else {
+        await _supabase
+            .from('user_favorites')
+            .delete()
+            .eq('user_id', userId)
+            .eq('wallpaper_id', wId);
+      }
+    } catch (_) {
+      // Ignored for smooth offline resiliency
+    }
+  }
+
+  /// Check if favorite: Instant O(1) in-memory check
   static Future<bool> isFavorite(String wallpaperId) async {
+    if (_memoryCache != null) {
+      return _memoryCache!.contains(wallpaperId);
+    }
     final favorites = await getFavorites();
     return favorites.contains(wallpaperId);
+  }
+
+  /// Synchronous instant check when memory cache is populated
+  static bool isFavoriteSync(String wallpaperId) {
+    return _memoryCache?.contains(wallpaperId) ?? false;
   }
 }

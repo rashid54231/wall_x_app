@@ -8,6 +8,8 @@ import 'features/user/screens/user_dashboard.dart';
 import 'features/user/screens/onboarding_screen.dart';
 import 'features/user/providers/auth_provider.dart';
 
+import 'features/user/controllers/wallpaper_cache.dart';
+
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 
 Future<void> main() async {
@@ -23,10 +25,20 @@ Future<void> main() async {
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxdHJ4YmxtcHRxZ2xvc213cHFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMDAzMTAsImV4cCI6MjA5NTg3NjMxMH0.izA5tv6gguYmotg-b6rSJgr5w9Bbyz9_GsNasOthJ2c',
   );
 
-  // Initialize OneSignal Push Notifications
-  OneSignal.Debug.setLogLevel(OSLogLevel.verbose);
-  OneSignal.initialize("YOUR_ONESIGNAL_APP_ID"); // TODO: Replace with your OneSignal App ID
-  OneSignal.Notifications.requestPermission(true);
+  // ⚡ Pre-warm local cache from disk so Home & Tabs render in 0ms!
+  await WallpaperCache().initFromDisk();
+
+  // Initialize OneSignal Push Notifications asynchronously without blocking UI startup
+  Future.microtask(() {
+    try {
+      const oneSignalAppId = "YOUR_ONESIGNAL_APP_ID";
+      if (oneSignalAppId != "YOUR_ONESIGNAL_APP_ID" && oneSignalAppId.isNotEmpty) {
+        OneSignal.Debug.setLogLevel(OSLogLevel.none);
+        OneSignal.initialize(oneSignalAppId);
+        OneSignal.Notifications.requestPermission(true);
+      }
+    } catch (_) {}
+  });
 
   runApp(ProviderScope(child: MyApp(isFirstTime: isFirstTime)));
 }

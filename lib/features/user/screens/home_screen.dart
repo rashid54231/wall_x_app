@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../controllers/wallpaper_cache.dart';
 import '../controllers/favorites_storage.dart';
 import 'detail_screen.dart';
 import 'category_wallpapers_screen.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/utils/wallpaper_cache_manager.dart';
+import '../../shared_widgets/fast_wallpaper_image.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,61 +36,95 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // ⚡ Instant Cache-First Load: If cache exists in memory or disk, render IMMEDIATELY (0ms)
+    if (_cache.categories.isNotEmpty && _cache.allWallpapers.isNotEmpty) {
+      _processData(_cache.categories, _cache.allWallpapers, []);
+      FavoritesStorage.getFavorites().then((favs) {
+        if (mounted) setState(() => _favoritedIds = favs);
+      });
+      _isLoading = false;
+    } else {
+      _isLoading = true;
+    }
     _loadInitialUserData();
   }
 
-  Future<void> _loadInitialUserData() async {
-    setState(() => _isLoading = true);
+  void _processData(
+    List<Map<String, dynamic>> cats,
+    List<Map<String, dynamic>> walls,
+    List<String> savedFavs,
+  ) {
+    _categories = cats;
+    _favoritedIds = savedFavs;
+
+    final Map<int, List<Map<String, dynamic>>> catMap = {};
+    final Map<int, String> catNameMap = {
+      for (final c in cats) (c['id'] as int): (c['name'] as String)
+    };
+
+    for (final wall in walls) {
+      final catId = wall['category_id'] as int?;
+      if (catId != null) {
+        catMap.putIfAbsent(catId, () => []).add(wall);
+      }
+    }
+    _wallpapersByCategory = catMap;
+
+    _liveWallpapers = walls.where((wall) {
+      final isAnim = wall['is_animated'];
+      final url = (wall['url'] ?? '').toString().toLowerCase();
+      return (isAnim == true || isAnim == 1 || isAnim == 'true') ||
+             url.endsWith('.mp4') ||
+             url.endsWith('.mov') ||
+             url.endsWith('.webm') ||
+             url.endsWith('.avi') ||
+             url.endsWith('.mkv') ||
+             url.contains('.mp4?') ||
+             url.contains('.mov?') ||
+             url.contains('video');
+    }).toList();
+
+    for (final wall in _liveWallpapers) {
+      final cid = wall['category_id'];
+      if (cid != null && catNameMap.containsKey(cid)) {
+        wall['category_name'] = catNameMap[cid];
+      }
+    }
+
+    _precacheVisibleWallpapers(walls);
+  }
+
+  // ⚡ Pre-cache visible wallpapers in the background so they appear with 0ms delay
+  void _precacheVisibleWallpapers(List<Map<String, dynamic>> walls) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      for (final wall in walls.take(15)) {
+        final url = wall['url'] as String?;
+        if (url != null && url.isNotEmpty && !url.contains('.mp4') && !url.contains('.mov')) {
+          precacheImage(
+            CachedNetworkImageProvider(url, cacheManager: WallpaperImageCacheManager.instance),
+            context,
+          ).catchError((_) {});
+        }
+      }
+    });
+  }
+
+  Future<void> _loadInitialUserData({bool forceRefresh = false}) async {
     try {
       final results = await Future.wait([
-        _cache.fetchCategories(),
-        _cache.fetchAllWallpapers(),
-        FavoritesStorage.getFavorites(),
+        _cache.fetchCategories(forceRefresh: forceRefresh),
+        _cache.fetchAllWallpapers(forceRefresh: forceRefresh),
+        FavoritesStorage.getFavorites(forceRefresh: forceRefresh),
       ]);
 
       final cats = results[0] as List<Map<String, dynamic>>;
       final walls = results[1] as List<Map<String, dynamic>>;
       final savedFavs = results[2] as List<String>;
 
-      // Pre-compute category map to avoid filtering in itemBuilder
-      final Map<int, List<Map<String, dynamic>>> catMap = {};
-      final Map<int, String> catNameMap = {
-        for (final c in cats) (c['id'] as int): (c['name'] as String)
-      };
-
-      for (final wall in walls) {
-        final catId = wall['category_id'] as int;
-        catMap.putIfAbsent(catId, () => []).add(wall);
-      }
-
-      // Filter live / animated wallpapers
-      final liveWalls = walls.where((wall) {
-        final isAnim = wall['is_animated'];
-        final url = (wall['url'] ?? '').toString().toLowerCase();
-        return (isAnim == true || isAnim == 1 || isAnim == 'true') ||
-               url.endsWith('.mp4') ||
-               url.endsWith('.mov') ||
-               url.endsWith('.webm') ||
-               url.endsWith('.avi') ||
-               url.endsWith('.mkv') ||
-               url.contains('.mp4?') ||
-               url.contains('.mov?') ||
-               url.contains('video');
-      }).toList();
-
-      for (final wall in liveWalls) {
-        final cid = wall['category_id'];
-        if (cid != null && catNameMap.containsKey(cid)) {
-          wall['category_name'] = catNameMap[cid];
-        }
-      }
-
       if (mounted) {
         setState(() {
-          _categories = cats;
-          _wallpapersByCategory = catMap;
-          _liveWallpapers = liveWalls;
-          _favoritedIds = savedFavs;
+          _processData(cats, walls, savedFavs);
           _isLoading = false;
         });
       }
@@ -127,21 +164,25 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 6),
-            // 🔥 Live Wallpapers Row right below search bar
-            if (_liveWallpapers.isNotEmpty) ...[
-              _buildLiveWallpapersSection(),
-              const SizedBox(height: 6),
-            ],
-            _buildCategoryPortionsList(),
-          ],
-        ),
-      ),
+          : RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () => _loadInitialUserData(forceRefresh: true),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 6),
+                    // 🔥 Live Wallpapers Row right below search bar
+                    if (_liveWallpapers.isNotEmpty) ...[
+                      _buildLiveWallpapersSection(),
+                      const SizedBox(height: 6),
+                    ],
+                    _buildCategoryPortionsList(),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 
@@ -574,23 +615,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     )
-                  : Image.network(
-                      wallpaper['url'],
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      cacheWidth: 300,
-                      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                        if (wasSynchronouslyLoaded) return child;
-                        return AnimatedOpacity(
-                          opacity: frame == null ? 0 : 1,
-                          duration: const Duration(milliseconds: 300),
-                          child: child,
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) => const Center(
-                        child: Icon(Icons.broken_image_rounded, color: Colors.grey, size: 32),
-                      ),
+                  : FastWallpaperImage(
+                      imageUrl: wallpaper['url'] ?? '',
+                      memCacheWidth: 350,
                     ),
             ),
             Positioned(
