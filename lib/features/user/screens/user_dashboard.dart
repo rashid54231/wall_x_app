@@ -80,41 +80,75 @@ class _UserDashboardState extends State<UserDashboard> {
       const UserCenterScreen(),
     ];
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.background : Colors.white,
-      appBar: _currentIndex == 4
-          ? null
-          : AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("Hello, Explorer", style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500)),
-              Text("Find Your Style", style: TextStyle(fontSize: 22, color: titleColor, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-            ],
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12, top: 4),
-            child: IconButton(
-              icon: Icon(Icons.notifications_active_rounded, color: titleColor, size: 24),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const NotificationScreen()),
-                );
-              },
+    PreferredSizeWidget? buildAppBar() {
+      if (_currentIndex == 0) {
+        return AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Hello, Explorer", style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500)),
+                Text("Find Your Style", style: TextStyle(fontSize: 22, color: titleColor, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+              ],
             ),
           ),
-        ],
-      ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 12, top: 4),
+              child: IconButton(
+                icon: Icon(Icons.notifications_active_rounded, color: titleColor, size: 24),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      } else if (_currentIndex == 1) {
+        return AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new_rounded, color: titleColor, size: 20),
+            onPressed: () => setState(() => _currentIndex = 0),
+          ),
+          title: Text(
+            "Saved Favorites (${favoriteWallpapers.length})",
+            style: TextStyle(fontSize: 20, color: titleColor, fontWeight: FontWeight.bold),
+          ),
+        );
+      } else if (_currentIndex == 2) {
+        return AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new_rounded, color: titleColor, size: 20),
+            onPressed: () => setState(() => _currentIndex = 0),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.workspace_premium, color: Colors.amber, size: 22),
+              SizedBox(width: 8),
+              Text("Premium Wallpapers", style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        );
+      }
+      return null;
+    }
+
+    return Scaffold(
+      backgroundColor: isDark ? AppColors.background : Colors.white,
+      appBar: buildAppBar(),
       body: Column(
         children: [
-          if (_currentIndex != 4)
+          if (_currentIndex == 0)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(

@@ -31,6 +31,7 @@ class WallpaperCache {
 
   List<Map<String, dynamic>> get allWallpapers => _allWallpapers;
   List<Map<String, dynamic>> get categories => _categories;
+  List<Map<String, dynamic>> get allCategories => _categories;
   List<Map<String, dynamic>> get allCatalogs => _allCatalogs;
 
   bool get _isCacheValid =>

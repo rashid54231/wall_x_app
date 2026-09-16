@@ -202,23 +202,12 @@ class PremiumPaywallScreen extends ConsumerStatefulWidget {
 }
 
 class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen> {
-  bool _isBuying = false;
+  final bool _isBuying = false;
 
   Future<void> _buySubscription() async {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const PremiumPurchaseScreen()),
-    );
-  }
-
-  void _showSnackBar(String message, {bool isError = true}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red[800] : Colors.green[800],
-        behavior: SnackBarBehavior.floating,
-      ),
     );
   }
 
@@ -300,11 +289,11 @@ class _PremiumPaywallScreenState extends ConsumerState<PremiumPaywallScreen> {
                             Text("Cancel anytime. Auto-renews.", style: TextStyle(color: Colors.grey[500], fontSize: 12)),
                           ],
                         ),
-                        Column(
+                        const Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text("Rs. 290", style: TextStyle(color: Colors.amber, fontSize: 20, fontWeight: FontWeight.w900)),
-                            const Text("/ month", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                            Text("/ month", style: TextStyle(color: Colors.white54, fontSize: 12)),
                           ],
                         )
                       ],
