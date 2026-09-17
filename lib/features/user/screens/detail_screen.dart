@@ -904,3 +904,4 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
 //detaailsscreen
 //de
 //detavwhdb
+//dcgvh
